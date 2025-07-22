@@ -1,22 +1,773 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="styles.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus App</title>
-        <script type="module" src="/main.js" defer></script>
-    </head>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>常德市妇幼保健院药品价格公示系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 双重加载机制：优先CDN，失败后加载本地 -->
+    <script>
+      function loadXLSX() {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        script.onerror = function() {
+          const fallbackScript = document.createElement('script');
+          fallbackScript.src = 'lib/xlsx.full.min.js';
+          document.head.appendChild(fallbackScript);
+        };
+        document.head.appendChild(script);
+      }
+      loadXLSX();
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f9fc;
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 102, 204, 0.15);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #0066cc, #4da6ff);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+            position: relative;
+            transition: padding 0.3s ease;
+            z-index: 10;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: font-size 0.3s ease;
+        }
+        
+        .control-panel {
+            background-color: #e6f2ff;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #d9e4f0;
+            transition: opacity 0.3s ease, padding 0.3s ease;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .btn {
+            background-color: #4da6ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 102, 204, 0.2);
+        }
+        
+        .btn:hover {
+            background-color: #66b3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 102, 204, 0.25);
+        }
+        
+        .btn:active {
+            background-color: #3385ff;
+            transform: translateY(0);
+        }
+        
+        .btn i {
+            font-size: 18px;
+        }
+        
+        .status-bar {
+            background-color: #e6f2ff;
+            color: #0066cc;
+            padding: 10px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            border-top: 2px solid #d9e4f0;
+            transition: padding 0.3s ease;
+        }
+        
+        .status-bar .copyright {
+            flex-grow: 1;
+            text-align: center;
+        }
+        
+        .status-bar .status-info {
+            min-width: 250px;
+            text-align: right;
+        }
+        
+        .table-container {
+            flex: 1;
+            overflow: hidden;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .table-wrapper {
+            flex: 1;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+        
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            height: 100%;
+            table-layout: fixed;
+        }
+        
+        .price-table th {
+            background-color: #e6f2ff;
+            color: #0066cc;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 18px 15px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .price-table td {
+            padding: 16px 15px;
+            font-size: 17px;
+            border-bottom: 1px solid #e6f0fa;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .price-table td:nth-child(1),
+        .price-table td:nth-child(5) {
+            text-align: left;
+        }
+        
+        .price-table tr:nth-child(even) {
+            background-color: #f0f7ff;
+        }
+        
+        .price-table tr:hover {
+            background-color: #e6f7ff;
+        }
+        
+        .name-cell, .manufacturer-cell {
+            text-align: left;
+        }
+        
+        /* 优化后的列宽分配 */
+        .price-table th:nth-child(1),
+        .price-table td:nth-child(1) {
+            width: 25%; /* 药品名称 - 增加宽度 */
+        }
+        
+        .price-table th:nth-child(2),
+        .price-table td:nth-child(2) {
+            width: 15%; /* 规格 */
+        }
+        
+        .price-table th:nth-child(3),
+        .price-table td:nth-child(3) {
+            width: 10%; /* 剂型 - 减小宽度 */
+        }
+        
+        .price-table th:nth-child(4),
+        .price-table td:nth-child(4) {
+            width: 10%; /* 单价 - 减小宽度 */
+        }
+        
+        .price-table th:nth-child(5),
+        .price-table td:nth-child(5) {
+            width: 29%; /* 厂家 - 增加宽度 */
+        }
+        
+        .price-table th:nth-child(6),
+        .price-table td:nth-child(6) {
+            width: 11%; /* 备注 - 减小宽度 */
+        }
+        
+        /* 全屏样式 */
+        .fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1000;
+            border-radius: 0;
+            padding: 0;
+            max-width: none;
+            box-shadow: none;
+        }
+        
+        .fullscreen .header {
+            padding: 15px;
+        }
+        
+        .fullscreen .header h1 {
+            font-size: 36px;
+        }
+        
+        .fullscreen .price-table th {
+            font-size: 20px;
+            padding: 15px;
+        }
+        
+        .fullscreen .price-table td {
+            font-size: 18px;
+            padding: 12px;
+        }
+        
+        .fullscreen .control-panel {
+            display: none;
+        }
+        
+        .fullscreen .status-bar {
+            padding: 8px 15px;
+            justify-content: center;
+        }
+        
+        .fullscreen .status-bar .status-info {
+            display: none;
+        }
+        
+        .fullscreen .status-bar .copyright {
+            text-align: center;
+            font-size: 18px;
+        }
+        
+        .fullscreen .table-container {
+            padding: 10px;
+        }
+        
+        /* 空数据提示 */
+        .empty-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+            text-align: center;
+        }
+        
+        .empty-message i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #4da6ff;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .price-table th:nth-child(1),
+            .price-table td:nth-child(1) {
+                width: 32%;
+            }
+            
+            .price-table th:nth-child(5),
+            .price-table td:nth-child(5) {
+                width: 25%;
+            }
+            
+            .price-table th:nth-child(6),
+            .price-table td:nth-child(6) {
+                width: 8%;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .price-table th:nth-child(1),
+            .price-table td:nth-child(1) {
+                width: 30%;
+            }
+            
+            .price-table th:nth-child(2),
+            .price-table td:nth-child(2) {
+                width: 14%;
+            }
+            
+            .price-table th:nth-child(5),
+            .price-table td:nth-child(5) {
+                width: 22%;
+            }
+            
+            .price-table th, .price-table td {
+                padding: 14px 10px;
+                font-size: 16px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .control-panel {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .buttons {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .btn {
+                padding: 10px 15px;
+                font-size: 14px;
+                flex: 1 0 30%;
+            }
+            
+            .price-table th, .price-table td {
+                padding: 12px 8px;
+                font-size: 14px;
+            }
+            
+            .price-table th:nth-child(1),
+            .price-table td:nth-child(1) {
+                width: 28%;
+            }
+            
+            .price-table th:nth-child(2),
+            .price-table td:nth-child(2) {
+                width: 12%;
+            }
+            
+            .price-table th:nth-child(3),
+            .price-table td:nth-child(3) {
+                width: 10%;
+            }
+            
+            .price-table th:nth-child(4),
+            .price-table td:nth-child(4) {
+                width: 10%;
+            }
+            
+            .price-table th:nth-child(5),
+            .price-table td:nth-child(5) {
+                width: 20%;
+            }
+            
+            .price-table th:nth-child(6),
+            .price-table td:nth-child(6) {
+                width: 10%;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 5px;
+                text-align: center;
+            }
+            
+            .status-bar .status-info {
+                text-align: center;
+                min-width: auto;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .btn {
+                flex: 1 0 45%;
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+            
+            .price-table th, .price-table td {
+                font-size: 12px;
+                padding: 10px 5px;
+            }
+            
+            .price-table th:nth-child(1),
+            .price-table td:nth-child(1) {
+                width: 26%;
+            }
+            
+            .price-table th:nth-child(2),
+            .price-table td:nth-child(2) {
+                width: 11%;
+            }
+            
+            .price-table th:nth-child(3),
+            .price-table td:nth-child(3) {
+                width: 10%;
+            }
+            
+            .price-table th:nth-child(4),
+            .price-table td:nth-child(4) {
+                width: 10%;
+            }
+            
+            .price-table th:nth-child(5),
+            .price-table td:nth-child(5) {
+                width: 18%;
+            }
+            
+            .price-table th:nth-child(6),
+            .price-table td:nth-child(6) {
+                width: 10%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="appContainer">
+        <div class="header">
+            <h1>常德市妇幼保健院药品价格公示</h1>
+        </div>
+        
+        <div class="control-panel">
+            <div class="buttons">
+                <button class="btn" id="importBtn">
+                    <i class="fas fa-file-import"></i> 导入数据
+                </button>
+                <button class="btn" id="playBtn">
+                    <i class="fas fa-play"></i> 开始滚动
+                </button>
+                <button class="btn" id="fullscreenBtn">
+                    <i class="fas fa-expand"></i> 全屏显示
+                </button>
+            </div>
+            <div class="file-input">
+                <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;">
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table class="price-table" id="priceTable">
+                    <thead>
+                        <tr>
+                            <th>药品名称</th>
+                            <th>规格</th>
+                            <th>剂型</th>
+                            <th>单价(元)</th>
+                            <th>厂家</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="6" class="empty-message">
+                                <i class="fas fa-inbox"></i>
+                                请导入药品价格数据文件
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="copyright">常德市妇幼保健院 © 2025 药品价格公示系统</div>
+            <div class="status-info" id="statusText">就绪 | 数据行数: 0 | 当前页: 0/0</div>
+        </div>
+    </div>
 
-    <body>
-        <main class="container">
-            <h1>Welcome to PakePlus</h1>
-
-            <form class="row" id="greet-form">
-                <input id="greet-input" placeholder="Enter a name..." />
-                <button type="submit">Greet</button>
-            </form>
-            <p id="greet-msg"></p>
-        </main>
-    </body>
+    <script>
+        // 全局变量
+        let medicineData = [];
+        let currentIndex = 0;
+        let itemsPerPage = 10;
+        let scrollInterval = null;
+        let isFullscreen = false;
+        const scrollSpeed = 4000; // 4秒滚动一次
+        
+        // 初始化药品数据
+        const sampleData = [
+            ["测试数据1", "0.25g*24粒", "胶囊剂", "15.80", "华北制药股份有限公司", "医保甲类"],
+            ["测试数据2", "100mg*6片", "片剂", "32.50", "广州白云山制药总厂", "医保乙类"],
+            ["测试数据3", "0.3g*20粒", "胶囊剂", "18.90", "中美天津史克制药有限公司", "医保甲类"],
+            ["测试数据4", "0.5g*48片", "片剂", "25.60", "北京万生药业有限责任公司", "医保甲类"],
+            ["测试数据5", "20mg*7片", "片剂", "42.30", "辉瑞制药有限公司", "医保乙类"],
+            ["测试数据6", "10mg*6片", "片剂", "16.80", "拜耳医药保健有限公司", "医保乙类"],
+            ["测试数据7", "20mg*14粒", "胶囊剂", "28.50", "阿斯利康制药有限公司", "医保甲类"],
+            ["测试数据8", "300单位/支", "注射剂", "65.00", "诺和诺德(中国)制药有限公司", "医保甲类"],
+            ["测试数据9", "30mg*7片", "片剂", "35.20", "拜耳医药保健有限公司", "医保甲类"],
+            ["测试数据10", "3g*10袋", "散剂", "22.40", "博福-益普生(天津)制药有限公司", "医保乙类"],
+            ["测试数据11", "100片/瓶", "片剂", "12.50", "北京同仁堂科技发展股份有限公司", "医保甲类"],
+            ["测试数据12", "100mg*100片", "片剂", "8.90", "石药集团欧意药业有限公司", "医保甲类"],
+            ["测试数据13", "10ml*12支", "口服液", "18.60", "哈药集团制药六厂", "医保乙类"],
+            ["测试数据14", "10ml*10支", "口服液", "24.80", "河南太龙药业股份有限公司", "医保甲类"],
+            ["测试数据15", "10g*20袋", "颗粒剂", "16.20", "广州白云山和记黄埔中药有限公司", "医保甲类"]
+        ];
+        
+        // DOM元素
+        const importBtn = document.getElementById('importBtn');
+        const playBtn = document.getElementById('playBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const fileInput = document.getElementById('fileInput');
+        const tableBody = document.getElementById('tableBody');
+        const statusText = document.getElementById('statusText');
+        const appContainer = document.getElementById('appContainer');
+        const priceTable = document.getElementById('priceTable');
+        
+        // 初始化应用
+        function initApp() {
+            // 使用示例数据填充表格
+            medicineData = sampleData;
+            updateTable();
+            
+            // 添加事件监听器
+            importBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileUpload);
+            playBtn.addEventListener('click', togglePlay);
+            fullscreenBtn.addEventListener('click', toggleFullscreen);
+            document.addEventListener('keydown', handleKeyDown);
+        }
+        
+        // 处理文件上传
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    // 获取第一个工作表
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, range: 1});
+                    
+                    // 移除可能的空行
+                    medicineData = jsonData.filter(row => row.length > 0 && row.some(cell => cell !== null && cell !== ''));
+                    
+                    // 更新表格
+                    updateTable();
+                    statusText.textContent = `已导入数据 | 数据行数: ${medicineData.length} | 当前页: ${getCurrentPage()}/${getTotalPages()}`;
+                    
+                    // 重置文件输入
+                    fileInput.value = '';
+                } catch (error) {
+                    alert('文件解析错误: ' + error.message);
+                    statusText.textContent = '导入失败: ' + error.message;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // 更新表格显示
+        function updateTable() {
+            // 清空表格
+            tableBody.innerHTML = '';
+            
+            if (medicineData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-message">
+                            <i class="fas fa-inbox"></i>
+                            请导入药品价格数据文件
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // 计算当前页数据
+            const start = currentIndex;
+            const end = Math.min(start + itemsPerPage, medicineData.length);
+            
+            // 填充数据行
+            for (let i = start; i < end; i++) {
+                const row = medicineData[i];
+                const tr = document.createElement('tr');
+                
+                row.forEach((cell, index) => {
+                    const td = document.createElement('td');
+                    td.textContent = cell || '-';
+                    
+                    // 设置特定列的样式
+                    if (index === 0) {
+                        td.classList.add('name-cell');
+                    } else if (index === 4) {
+                        td.classList.add('manufacturer-cell');
+                    }
+                    
+                    tr.appendChild(td);
+                });
+                
+                // 补全可能的缺失列
+                for (let j = row.length; j < 6; j++) {
+                    const td = document.createElement('td');
+                    td.textContent = '-';
+                    tr.appendChild(td);
+                }
+                
+                tableBody.appendChild(tr);
+            }
+            
+            // 填充剩余空行
+            const remainingRows = itemsPerPage - (end - start);
+            for (let i = 0; i < remainingRows; i++) {
+                const tr = document.createElement('tr');
+                for (let j = 0; j < 6; j++) {
+                    const td = document.createElement('td');
+                    td.innerHTML = '&nbsp;';
+                    tr.appendChild(td);
+                }
+                tableBody.appendChild(tr);
+            }
+            
+            // 调整行高以适应屏幕
+            adjustRowHeight();
+        }
+        
+        // 调整行高以适应屏幕
+        function adjustRowHeight() {
+            if (medicineData.length === 0) return;
+            
+            const rows = tableBody.querySelectorAll('tr');
+            if (rows.length === 0) return;
+            
+            // 获取表格容器高度
+            const tableContainer = document.querySelector('.table-wrapper');
+            const containerHeight = tableContainer.clientHeight;
+            
+            // 获取表头高度
+            const headerHeight = document.querySelector('thead').clientHeight;
+            
+            // 计算每行高度
+            const rowHeight = (containerHeight - headerHeight) / rows.length;
+            
+            // 设置每行高度
+            rows.forEach(row => {
+                row.style.height = `${rowHeight}px`;
+            });
+        }
+        
+        // 滚动到下一页
+        function scrollToNextPage() {
+            if (medicineData.length === 0) return;
+            
+            currentIndex += itemsPerPage;
+            if (currentIndex >= medicineData.length) {
+                currentIndex = 0;
+            }
+            
+            updateTable();
+            statusText.textContent = `数据行数: ${medicineData.length} | 当前页: ${getCurrentPage()}/${getTotalPages()}`;
+        }
+        
+        // 开始/停止滚动
+        function togglePlay() {
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+                playBtn.innerHTML = '<i class="fas fa-play"></i> 开始滚动';
+            } else {
+                scrollInterval = setInterval(scrollToNextPage, scrollSpeed);
+                playBtn.innerHTML = '<i class="fas fa-pause"></i> 停止滚动';
+            }
+        }
+        
+        // 切换全屏
+        function toggleFullscreen() {
+            if (!isFullscreen) {
+                enterFullscreen();
+            } else {
+                exitFullscreen();
+            }
+        }
+        
+        // 进入全屏模式
+        function enterFullscreen() {
+            appContainer.classList.add('fullscreen');
+            document.documentElement.style.overflow = 'hidden';
+            isFullscreen = true;
+            fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i> 退出全屏';
+            updateTable();
+        }
+        
+        // 退出全屏模式
+        function exitFullscreen() {
+            appContainer.classList.remove('fullscreen');
+            document.documentElement.style.overflow = '';
+            isFullscreen = false;
+            fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i> 全屏显示';
+            updateTable();
+        }
+        
+        // 处理键盘事件
+        function handleKeyDown(event) {
+            if (event.key === 'Escape' && isFullscreen) {
+                exitFullscreen();
+            }
+            
+            // 空格键控制滚动
+            if (event.key === ' ') {
+                event.preventDefault();
+                togglePlay();
+            }
+        }
+        
+        // 计算总页数
+        function getTotalPages() {
+            if (medicineData.length === 0) return 0;
+            return Math.ceil(medicineData.length / itemsPerPage);
+        }
+        
+        // 计算当前页
+        function getCurrentPage() {
+            return Math.floor(currentIndex / itemsPerPage) + 1;
+        }
+        
+        // 页面加载完成后初始化应用
+        window.addEventListener('DOMContentLoaded', initApp);
+        
+        // 窗口大小变化时调整行高
+        window.addEventListener('resize', () => {
+            if (medicineData.length > 0) {
+                adjustRowHeight();
+            }
+        });
+    </script>
+</body>
 </html>
